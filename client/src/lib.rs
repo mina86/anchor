@@ -25,7 +25,7 @@ use solana_client::{
 };
 use solana_sdk::account::Account;
 use solana_sdk::commitment_config::CommitmentConfig;
-use solana_sdk::signature::{Signature, Signer};
+use solana_sdk::signature::Signature;
 use solana_sdk::transaction::Transaction;
 use std::iter::Map;
 use std::marker::PhantomData;
@@ -55,6 +55,11 @@ mod blocking;
 #[cfg(feature = "async")]
 mod nonblocking;
 
+#[cfg(feature = "async")]
+use nonblocking::Signer;
+#[cfg(not(feature = "async"))]
+use solana_sdk::signature::Signer;
+
 const PROGRAM_LOG: &str = "Program log: ";
 const PROGRAM_DATA: &str = "Program data: ";
 
@@ -66,7 +71,7 @@ pub struct Client<C> {
     cfg: Config<C>,
 }
 
-impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
+impl<C: Clone + Deref<Target = impl Signer> + Send + Sync> Client<C> {
     pub fn new(cluster: Cluster, payer: C) -> Self {
         Self {
             cfg: Config {
@@ -103,7 +108,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
 /// that's used when loaded Signer from keypair file. This struct is used to wrap the usage.
 pub struct DynSigner(pub Arc<dyn Signer>);
 
-impl Signer for DynSigner {
+impl solana_sdk::signature::Signer for DynSigner {
     fn pubkey(&self) -> Pubkey {
         self.0.pubkey()
     }
@@ -163,7 +168,7 @@ pub struct Program<C> {
     rt: tokio::runtime::Runtime,
 }
 
-impl<C: Deref<Target = impl Signer> + Clone> Program<C> {
+impl<C: Deref<Target = impl Signer> + Clone + Send + Sync> Program<C> {
     pub fn payer(&self) -> Pubkey {
         self.cfg.payer.pubkey()
     }
@@ -448,12 +453,15 @@ pub struct RequestBuilder<'a, C> {
     payer: C,
     // Serialized instruction data for the target RPC.
     instruction_data: Option<Vec<u8>>,
+    #[cfg(not(feature = "async"))]
     signers: Vec<&'a dyn Signer>,
+    #[cfg(feature = "async")]
+    signers: nonblocking::Signers<'a>,
     #[cfg(not(feature = "async"))]
     handle: &'a Handle,
 }
 
-impl<'a, C: Deref<Target = impl Signer> + Clone> RequestBuilder<'a, C> {
+impl<'a, C: Deref<Target = impl Signer> + Clone + Send + Sync> RequestBuilder<'a, C> {
     #[must_use]
     pub fn payer(mut self, payer: C) -> Self {
         self.payer = payer;
@@ -522,7 +530,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RequestBuilder<'a, C> {
     ) -> Result<Transaction, ClientError> {
         let instructions = self.instructions()?;
         let mut signers = self.signers.clone();
-        signers.push(&*self.payer);
+        signers.push(&self.payer);
 
         let tx = Transaction::new_signed_with_payer(
             &instructions,

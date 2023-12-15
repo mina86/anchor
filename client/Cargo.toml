@@ -14,6 +14,7 @@ debug = []
 [dependencies]
 anchor-lang = { path = "../lang", version = "0.29.0" }
 anyhow = "1"
+bytemuck = {version = "1.4.0", features = ["derive"]}
 futures = "0.3"
 regex = "1"
 serde = { version = "1", features = ["derive"] }

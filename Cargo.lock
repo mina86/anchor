@@ -216,6 +216,7 @@ version = "0.29.0"
 dependencies = [
  "anchor-lang",
  "anyhow",
+ "bytemuck",
  "futures",
  "regex",
  "serde",
