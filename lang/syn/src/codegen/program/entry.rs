@@ -9,7 +9,7 @@ pub fn generate(program: &Program) -> proc_macro2::TokenStream {
         Err(anchor_lang::error::ErrorCode::InstructionMissing.into())
     });
     quote! {
-        #[cfg(not(feature = "no-entrypoint"))]
+        #[cfg(not(any(feature = "no-entrypoint", feature = "custom-entrypoint")))]
         anchor_lang::solana_program::entrypoint!(entry);
         /// The Anchor codegen exposes a programming model where a user defines
         /// a set of methods inside of a `#[program]` module in a way similar
